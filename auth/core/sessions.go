@@ -1,6 +1,11 @@
 package core
 
-import "github.com/edlingao/go-auth/auth/ports/driven"
+import (
+	"errors"
+
+	"github.com/edlingao/go-auth/auth/ports/driven"
+	"github.com/labstack/echo/v4"
+)
 
 type Session struct {
 	Username string `json:"username" db:"username"`
@@ -10,11 +15,16 @@ type Session struct {
 
 type SessionService struct {
 	dbService driven.StoringSessions[Session]
+  headerKey string
 }
 
-func NewSessionService(db driven.StoringSessions[Session]) SessionService {
+func NewSessionService(
+  db driven.StoringSessions[Session],
+  headerKey string,
+) SessionService {
 	return SessionService{
 		dbService: db,
+    headerKey: headerKey,
 	}
 }
 
@@ -44,26 +54,71 @@ func (ss *SessionService) Create(id, username, secret string) ( Token, error ) {
   return token, nil
 }
 
-func (ss *SessionService) Verify(user_id, token string) (bool, error) {
+func (ss *SessionService) Verify(token string) (Session, error) {
   session := Session{
-    UserID: user_id,
     Token: token,
   }
 
   session, err := ss.dbService.GetSQL(`
     SELECT * FROM sessions
     WHERE
-      user_id = :user_id AND
       token = :token
   `, session)
 
   if err != nil {
-    return false, err
+    return Session{}, err
   }
 
-  if session.UserID != user_id {
-    return false, nil
+  if session.UserID == "" {
+    return Session{}, errors.New("Invalid token")
   }
 
-  return true, nil
+  return session, nil
+}
+
+func (ss *SessionService) APIAuth(next echo.HandlerFunc) echo.HandlerFunc {
+  return func(c echo.Context) error {
+    // TODO: Add option to set Authorization header key
+    token := c.Request().Header.Get(ss.headerKey)
+
+    if token == "" {
+      return c.JSON(401, map[string]string{
+        "message": "Unauthorized",
+      })
+    }
+
+    session, err := ss.Verify(token)
+
+    if err != nil {
+      return c.JSON(401, map[string]string{
+        "message": "Unauthorized",
+      })
+    }
+
+    // inject user_id into context
+    c.Set("user_id", session.UserID)
+
+    return next(c)
+  }
+}
+
+func (ss *SessionService) WebAuth(next echo.HandlerFunc) echo.HandlerFunc {
+  return func(c echo.Context) error {
+    token, err := c.Cookie(ss.headerKey)
+
+    if err != nil {
+      return c.Redirect(302, "/login")
+    }
+
+    session, err := ss.Verify(token.Value)
+
+    if err != nil {
+      return c.Redirect(302, "/login")
+    }
+
+    // inject user_id into context
+    c.Set("user_id", session.UserID)
+
+    return next(c)
+  }
 }
