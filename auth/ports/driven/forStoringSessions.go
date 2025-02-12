@@ -6,5 +6,6 @@ type StoringSessions[T any] interface {
   Get(id, table string) (T, error)
   GetAll(table string) []T
   Delete(id, table string) error
+  DeleteByField(column, value, table string) error
   GetSQL(sql string, item T) (T, error)
 }
