@@ -91,7 +91,7 @@ func (ss *SessionService) APIAuth(next echo.HandlerFunc) echo.HandlerFunc {
 
     if err != nil {
       return c.JSON(401, map[string]string{
-        "message": "Unauthorized",
+        "message": "Unauthorized TEMPORAL",
       })
     }
 
