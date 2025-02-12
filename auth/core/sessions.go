@@ -8,6 +8,7 @@ import (
 )
 
 type Session struct {
+  ID        string `json:"id" db:"id"`
 	Username string `json:"username" db:"username"`
   UserID    string `json:"user_id" db:"user_id"`
 	Token    string `json:"token" db:"token"`
