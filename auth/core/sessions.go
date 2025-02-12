@@ -12,8 +12,8 @@ type SessionService struct {
 	dbService driven.StoringSessions[Session]
 }
 
-func NewSessionService(db driven.StoringSessions[Session]) *SessionService {
-	return &SessionService{
+func NewSessionService(db driven.StoringSessions[Session]) SessionService {
+	return SessionService{
 		dbService: db,
 	}
 }
