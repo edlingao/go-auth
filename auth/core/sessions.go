@@ -1,6 +1,6 @@
 package core
 
-import "github.com/edlingao/go-auth/internal/auth/ports/driven"
+import "github.com/edlingao/go-auth/auth/ports/driven"
 
 type Session struct {
 	Username string `json:"username" db:"username"`
