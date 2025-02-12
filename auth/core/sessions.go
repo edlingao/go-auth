@@ -18,7 +18,7 @@ func NewSessionService(db driven.StoringSessions[Session]) *SessionService {
 	}
 }
 
-func (ss *SessionService) Create(id, username, secret string) error {
+func (ss *SessionService) Create(id, username, secret string) ( Token, error ) {
   token, error := NewToken(NewTokenParams{
     UserID: username,
     Username: username,
@@ -26,7 +26,7 @@ func (ss *SessionService) Create(id, username, secret string) error {
   })
 
   if error != nil {
-    return error
+    return Token{}, error
   }
 
   session := Session{
@@ -35,16 +35,27 @@ func (ss *SessionService) Create(id, username, secret string) error {
     Token: token.Token,
   }
 
-  return ss.dbService.Insert(session, "INSERT INTO sessions (user_id, token) VALUES (:user_id, :token)")
+  err := ss.dbService.Insert(session, "INSERT INTO sessions (user_id, token) VALUES (:user_id, :token)")
+  
+  if err != nil {
+    return Token{}, err
+  }
+
+  return token, nil
 }
 
-func (ss *SessionService) Verify(user_id string) (bool, error) {
+func (ss *SessionService) Verify(user_id, token string) (bool, error) {
+  session := Session{
+    UserID: user_id,
+    Token: token,
+  }
+
   session, err := ss.dbService.GetSQL(`
     SELECT * FROM sessions
     WHERE
       user_id = :user_id AND
       token = :token
-  `)
+  `, session)
 
   if err != nil {
     return false, err
