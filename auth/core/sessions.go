@@ -62,8 +62,9 @@ func (ss *SessionService) Verify(token string) (Session, error) {
   session, err := ss.dbService.GetSQL(`
     SELECT * FROM sessions
     WHERE
-      token = :token
-  `, session)
+    token = ` + token,
+    session,
+  )
 
   if err != nil {
     return Session{}, err
