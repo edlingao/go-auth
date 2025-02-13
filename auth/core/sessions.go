@@ -8,115 +8,116 @@ import (
 )
 
 type Session struct {
-  ID        string `json:"id" db:"id"`
-	Username string `json:"username" db:"username"`
-  UserID    string `json:"user_id" db:"user_id"`
-	Token    string `json:"token" db:"token"`
+	ID        string `json:"id" db:"id"`
+	Username  string `json:"username" db:"username"`
+	UserID    string `json:"user_id" db:"user_id"`
+	Token     string `json:"token" db:"token"`
+	CreatedAt string `json:"created_at" db:"created_at"`
 }
 
 type SessionService struct {
 	dbService driven.StoringSessions[Session]
-  headerKey string
+	headerKey string
 }
 
 func NewSessionService(
-  db driven.StoringSessions[Session],
-  headerKey string,
+	db driven.StoringSessions[Session],
+	headerKey string,
 ) SessionService {
 	return SessionService{
 		dbService: db,
-    headerKey: headerKey,
+		headerKey: headerKey,
 	}
 }
 
-func (ss *SessionService) Create(id, username, secret string) ( Token, error ) {
-  token, error := NewToken(NewTokenParams{
-    UserID: username,
-    Username: username,
-    Secret: secret,
-  })
+func (ss *SessionService) Create(id, username, secret string) (Token, error) {
+	token, error := NewToken(NewTokenParams{
+		UserID:   username,
+		Username: username,
+		Secret:   secret,
+	})
 
-  if error != nil {
-    return Token{}, error
-  }
+	if error != nil {
+		return Token{}, error
+	}
 
-  session := Session{
-    UserID: id,
-    Username: username,
-    Token: token.Token,
-  }
+	session := Session{
+		UserID:   id,
+		Username: username,
+		Token:    token.Token,
+	}
 
-  err := ss.dbService.Insert(session, "INSERT INTO sessions (user_id, token) VALUES (:user_id, :token)")
-  
-  if err != nil {
-    return Token{}, err
-  }
+	err := ss.dbService.Insert(session, "INSERT INTO sessions (user_id, token) VALUES (:user_id, :token)")
 
-  return token, nil
+	if err != nil {
+		return Token{}, err
+	}
+
+	return token, nil
 }
 
 func (ss *SessionService) Verify(token string) (Session, error) {
-  session := Session{
-    Token: token,
-  }
-  
-  session, err := ss.dbService.GetByField("token", token, "sessions")
+	session := Session{
+		Token: token,
+	}
 
-  if err != nil {
-    return Session{}, err
-  }
+	session, err := ss.dbService.GetByField("token", token, "sessions")
 
-  if session.UserID == "" {
-    return Session{}, errors.New("Invalid token")
-  }
+	if err != nil {
+		return Session{}, err
+	}
 
-  return session, nil
+	if session.UserID == "" {
+		return Session{}, errors.New("Invalid token")
+	}
+
+	return session, nil
 }
 
 func (ss *SessionService) APIAuth(next echo.HandlerFunc) echo.HandlerFunc {
-  return func(c echo.Context) error {
-    // TODO: Add option to set Authorization header key
-    token := c.Request().Header.Get(ss.headerKey)
+	return func(c echo.Context) error {
+		// TODO: Add option to set Authorization header key
+		token := c.Request().Header.Get(ss.headerKey)
 
-    if token == "" {
-      return c.JSON(401, map[string]string{
-        "message": "Unauthorized",
-      })
-    }
+		if token == "" {
+			return c.JSON(401, map[string]string{
+				"message": "Unauthorized",
+			})
+		}
 
-    session, err := ss.Verify(token)
+		session, err := ss.Verify(token)
 
-    if err != nil {
-      return c.JSON(401, map[string]string{
-        "message": "Unauthorized TEMPORAL",
-        "error": err.Error(),
-      })
-    }
+		if err != nil {
+			return c.JSON(401, map[string]string{
+				"message": "Unauthorized TEMPORAL",
+				"error":   err.Error(),
+			})
+		}
 
-    // inject user_id into context
-    c.Set("user_id", session.UserID)
+		// inject user_id into context
+		c.Set("user_id", session.UserID)
 
-    return next(c)
-  }
+		return next(c)
+	}
 }
 
 func (ss *SessionService) WebAuth(next echo.HandlerFunc) echo.HandlerFunc {
-  return func(c echo.Context) error {
-    token, err := c.Cookie(ss.headerKey)
+	return func(c echo.Context) error {
+		token, err := c.Cookie(ss.headerKey)
 
-    if err != nil {
-      return c.Redirect(302, "/login")
-    }
+		if err != nil {
+			return c.Redirect(302, "/login")
+		}
 
-    session, err := ss.Verify(token.Value)
+		session, err := ss.Verify(token.Value)
 
-    if err != nil {
-      return c.Redirect(302, "/login")
-    }
+		if err != nil {
+			return c.Redirect(302, "/login")
+		}
 
-    // inject user_id into context
-    c.Set("user_id", session.UserID)
+		// inject user_id into context
+		c.Set("user_id", session.UserID)
 
-    return next(c)
-  }
+		return next(c)
+	}
 }
